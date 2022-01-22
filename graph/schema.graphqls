@@ -1,0 +1,156 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+
+type License {
+  id: Int!
+  name: String!
+  spdxName: String!
+  summary: String!
+  licenseMainTags: [LicenseMainTag!]!
+
+  fullText: String!
+  canFeatureTags: [FeatureTag!]!
+  cannotFeatureTags: [FeatureTag!]!
+  mustFeatureTags: [FeatureTag!]!
+  compareWith(otherLicenseID: Int!): CompareResult!
+}
+
+type LicenseMainTag {
+  id: Int!
+  mainTag: Dict!
+}
+
+type CompareResult {
+  canFeatureTags: FeatureTagDifference!
+  cannotFeatureTags: FeatureTagDifference!
+  mustFeatureTags: FeatureTagDifference!
+}
+
+type FeatureTagDifference {
+  more: [FeatureTag!]!
+  less: [FeatureTag!]!
+}
+
+type Dict {
+  id: Int!
+  type: String!
+  order: Int
+  name: String!
+  description: String
+}
+
+type FeatureTag {
+  id: Int!
+  order: Int!
+  name: String!
+  cnName: String!
+  description: String!
+}
+
+type ChangeRequestInput {
+  id: Int!
+  type: String!
+  objectId: Int
+  objectUpdatedAt: String!
+  changeOperation: String!
+  attributes: String!
+}
+
+type Tool {
+  id: Int!
+  name: String!
+  scanRate: Float!
+  stepNumber: Int!
+}
+
+type ToolResult {
+  id: Int!
+  repo: String!
+  branch: String!
+  repoBranchHash: String!
+  tool: Tool!
+  outputRawJson: String!
+  fileCount: Int!
+  scanedFileCount: Int!
+  beginAt: Time!
+  finishAt: Time
+}
+
+input LicenseInput {
+  name: String!
+  spdxName: String!
+  summary: String!
+  fullText: String!
+  canFeatureTags: [String!]!
+  cannotFeatureTags: [String!]!
+  mustFeatureTags: [String!]!
+}
+
+input FeatureTagInput {
+  name: String!
+  order: Int! = 0
+  description: String!
+}
+
+input DictInput {
+  type: String!
+  order: Int! = 0
+  name: String!
+  description: String
+}
+
+type Mutation {
+  createDict(input: DictInput!): Dict!
+  updateDict(dictID: Int!, input: DictInput!): Dict!
+  deleteDict(dictID: Int!): Boolean!
+  createFeatureTag(input: FeatureTagInput!): FeatureTag!
+  updateFeatureTag(featureTagID: Int!, input: FeatureTagInput!): FeatureTag!
+  createLicense(input: LicenseInput!): License!
+  updateLicense(licenseID: Int!, input: LicenseInput!): License!
+  deleteLicense(licenseID: Int!): Boolean!
+  createUserVisit(toolResultID: Int!): UserVisit!
+  createUserLicenseVisit(licenseID: Int!): UserLicenseVisit!
+}
+
+type Query {
+  licenses(page: Int!, pageSize: Int!, order: String!): LicensePagination!
+  license(licenseID: Int!): License!
+  listLicensesByType(indexType: String!, limit: Int!): [License!]!
+  listLicensesByName(name: String!, limit: Int!): [License!]
+  oauth2AuthURL(provider: String!): String!
+  toolResult(toolResultID: Int!): ToolResult!
+  currentUser: User!
+  userVisits: [UserVisit!]!
+  userLicenseVisits: [UserLicenseVisit!]!
+}
+
+type User {
+  id: Int!
+  authType: String!
+  authID: String!
+  authLogin: String!
+  avatarUrl: String!
+}
+
+type UserVisit {
+  id: Int!
+  user: User!
+  toolResult: ToolResult!
+}
+
+type UserLicenseVisit {
+  id: Int!
+  user: User!
+  license: License!
+}
+
+type LicensePagination {
+  page: Int!
+  count: Int!
+  total: Int!
+  totalPages: Int!
+  licenses: [License!]!
+}
+
+scalar Time
