@@ -3,15 +3,6 @@ on:
   push:
     branches:
       - main
-env:
-  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
-  GAR_LOCATION: us-central1 # TODO: update region of the Artifact Registry
-  GKE_CLUSTER: cluster-1 # TODO: update to cluster name
-  GKE_ZONE: us-central1-c # TODO: update to cluster zone
-  DEPLOYMENT_NAME: gke-test # TODO: update to deployment name
-  REPOSITORY: samples # TODO: update to Artifact Registry docker repository
-  IMAGE: static-site
-
 jobs:
   Explore-GitHub-Actions:
     runs-on: ubuntu-latest
@@ -23,7 +14,7 @@ jobs:
         name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v0"
         with:
-          service_account_key: ${{ secrects.GKE_SERVICE_ACCOUNT }}
+          service_account_key: ${{ secrets.GKE_SERVICE_ACCOUNT }}
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v0
 
