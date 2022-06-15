@@ -73,6 +73,10 @@ type License struct {
 	FullText           string     `json:"fullText"`
 	LicenseMainTags    []*LicenseMainTag
 	LicenseFeatureTags []*LicenseFeatureTag
+	FsfApproved        bool
+	OsiApproved        bool
+	OeApproved         bool
+	LowRisk            bool
 }
 
 func (l *License) CanFeatureTags() []*FeatureTag {

@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/jinzhu/gorm"
-
 	"github.com/alec-z/license-back/graph/auth"
 	"github.com/alec-z/license-back/graph/generated"
 	"github.com/alec-z/license-back/graph/index"
 	"github.com/alec-z/license-back/graph/model"
+	"github.com/jinzhu/gorm"
 	"github.com/olivere/elastic"
 	"golang.org/x/oauth2"
 )
@@ -173,6 +172,12 @@ func (r *queryResolver) ListLicensesByName(ctx context.Context, name string, lim
 	return licenses, nil
 }
 
+func (r *queryResolver) ListApprovedLicenses(ctx context.Context) ([]*model.License, error) {
+	var licenses []*model.License
+	r.DB.Where("is_yaml = 1").Order("name").Find(&licenses)
+	return licenses, nil
+}
+
 func (r *queryResolver) Oauth2AuthURL(ctx context.Context, provider string) (string, error) {
 	var url string
 	if provider == "github" {
@@ -238,5 +243,3 @@ type queryResolver struct{ *Resolver }
 //  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
 //    it when you're done.
 //  - You have helper methods in this file. Move them out to keep these resolver files clean.
-type userLicenseVisitResolver struct{ *Resolver }
-type toolResultResolver struct{ *Resolver }

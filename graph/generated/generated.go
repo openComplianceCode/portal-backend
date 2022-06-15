@@ -84,11 +84,15 @@ type ComplexityRoot struct {
 		CanFeatureTags    func(childComplexity int) int
 		CannotFeatureTags func(childComplexity int) int
 		CompareWith       func(childComplexity int, otherLicenseID int) int
+		FsfApproved       func(childComplexity int) int
 		FullText          func(childComplexity int) int
 		ID                func(childComplexity int) int
 		LicenseMainTags   func(childComplexity int) int
+		LowRisk           func(childComplexity int) int
 		MustFeatureTags   func(childComplexity int) int
 		Name              func(childComplexity int) int
+		OeApproved        func(childComplexity int) int
+		OsiApproved       func(childComplexity int) int
 		SpdxName          func(childComplexity int) int
 		Summary           func(childComplexity int) int
 	}
@@ -120,15 +124,16 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		CurrentUser        func(childComplexity int) int
-		License            func(childComplexity int, licenseID int) int
-		Licenses           func(childComplexity int, page int, pageSize int, order string) int
-		ListLicensesByName func(childComplexity int, name string, limit int) int
-		ListLicensesByType func(childComplexity int, indexType string, limit int) int
-		Oauth2AuthURL      func(childComplexity int, provider string) int
-		ToolResult         func(childComplexity int, toolResultID int) int
-		UserLicenseVisits  func(childComplexity int) int
-		UserVisits         func(childComplexity int) int
+		CurrentUser          func(childComplexity int) int
+		License              func(childComplexity int, licenseID int) int
+		Licenses             func(childComplexity int, page int, pageSize int, order string) int
+		ListApprovedLicenses func(childComplexity int) int
+		ListLicensesByName   func(childComplexity int, name string, limit int) int
+		ListLicensesByType   func(childComplexity int, indexType string, limit int) int
+		Oauth2AuthURL        func(childComplexity int, provider string) int
+		ToolResult           func(childComplexity int, toolResultID int) int
+		UserLicenseVisits    func(childComplexity int) int
+		UserVisits           func(childComplexity int) int
 	}
 
 	Tool struct {
@@ -189,6 +194,7 @@ type QueryResolver interface {
 	License(ctx context.Context, licenseID int) (*model.License, error)
 	ListLicensesByType(ctx context.Context, indexType string, limit int) ([]*model.License, error)
 	ListLicensesByName(ctx context.Context, name string, limit int) ([]*model.License, error)
+	ListApprovedLicenses(ctx context.Context) ([]*model.License, error)
 	Oauth2AuthURL(ctx context.Context, provider string) (string, error)
 	ToolResult(ctx context.Context, toolResultID int) (*model.ToolResult, error)
 	CurrentUser(ctx context.Context) (*model.User, error)
@@ -384,6 +390,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.License.CompareWith(childComplexity, args["otherLicenseID"].(int)), true
 
+	case "License.fsfApproved":
+		if e.complexity.License.FsfApproved == nil {
+			break
+		}
+
+		return e.complexity.License.FsfApproved(childComplexity), true
+
 	case "License.fullText":
 		if e.complexity.License.FullText == nil {
 			break
@@ -405,6 +418,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.License.LicenseMainTags(childComplexity), true
 
+	case "License.lowRisk":
+		if e.complexity.License.LowRisk == nil {
+			break
+		}
+
+		return e.complexity.License.LowRisk(childComplexity), true
+
 	case "License.mustFeatureTags":
 		if e.complexity.License.MustFeatureTags == nil {
 			break
@@ -418,6 +438,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.License.Name(childComplexity), true
+
+	case "License.oeApproved":
+		if e.complexity.License.OeApproved == nil {
+			break
+		}
+
+		return e.complexity.License.OeApproved(childComplexity), true
+
+	case "License.osiApproved":
+		if e.complexity.License.OsiApproved == nil {
+			break
+		}
+
+		return e.complexity.License.OsiApproved(childComplexity), true
 
 	case "License.spdxName":
 		if e.complexity.License.SpdxName == nil {
@@ -632,6 +666,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Licenses(childComplexity, args["page"].(int), args["pageSize"].(int), args["order"].(string)), true
+
+	case "Query.listApprovedLicenses":
+		if e.complexity.Query.ListApprovedLicenses == nil {
+			break
+		}
+
+		return e.complexity.Query.ListApprovedLicenses(childComplexity), true
 
 	case "Query.listLicensesByName":
 		if e.complexity.Query.ListLicensesByName == nil {
@@ -950,22 +991,26 @@ type License {
   cannotFeatureTags: [FeatureTag!]!
   mustFeatureTags: [FeatureTag!]!
   compareWith(otherLicenseID: Int!): CompareResult!
+  fsfApproved: Boolean
+  osiApproved: Boolean
+  oeApproved: Boolean
+  lowRisk: Boolean
 }
 
 type LicenseMainTag {
-    id: Int!
-    mainTag: Dict!
+  id: Int!
+  mainTag: Dict!
 }
 
 type CompareResult {
-    canFeatureTags: FeatureTagDifference!
-    cannotFeatureTags: FeatureTagDifference!
-    mustFeatureTags: FeatureTagDifference!
+  canFeatureTags: FeatureTagDifference!
+  cannotFeatureTags: FeatureTagDifference!
+  mustFeatureTags: FeatureTagDifference!
 }
 
 type FeatureTagDifference {
-    more: [FeatureTag!]!
-    less: [FeatureTag!]!
+  more: [FeatureTag!]!
+  less: [FeatureTag!]!
 }
 
 type Dict {
@@ -985,70 +1030,68 @@ type FeatureTag {
 }
 
 type ChangeRequestInput {
-    id: Int!
-    type: String!
-    objectId: Int
-    objectUpdatedAt: String!
-    changeOperation: String!
-    attributes: String!
+  id: Int!
+  type: String!
+  objectId: Int
+  objectUpdatedAt: String!
+  changeOperation: String!
+  attributes: String!
 }
 
 type Tool {
-    id: Int!
-    name: String!
-    scanRate: Float!
-    stepNumber: Int!
+  id: Int!
+  name: String!
+  scanRate: Float!
+  stepNumber: Int!
 }
 
 type ToolResult {
-    id: Int!
-    repo: String!
-    branch: String!
-    repoBranchHash: String!
-    tool: Tool!
-    outputRawJson: String!
-    fileCount: Int!
-    scanedFileCount: Int!
-    beginAt: Time!
-    finishAt: Time
+  id: Int!
+  repo: String!
+  branch: String!
+  repoBranchHash: String!
+  tool: Tool!
+  outputRawJson: String!
+  fileCount: Int!
+  scanedFileCount: Int!
+  beginAt: Time!
+  finishAt: Time
 }
 
-
-
 input LicenseInput {
-    name: String!
-    spdxName: String!
-    summary: String!
-    fullText: String!
-    canFeatureTags: [String!]!
-    cannotFeatureTags: [String!]!
-    mustFeatureTags: [String!]!
+  name: String!
+  spdxName: String!
+  summary: String!
+  fullText: String!
+  canFeatureTags: [String!]!
+  cannotFeatureTags: [String!]!
+  mustFeatureTags: [String!]!
 }
 
 input FeatureTagInput {
-    name: String!
-    order: Int! = 0
-    description: String!
+  name: String!
+  order: Int! = 0
+  description: String!
 }
 
 input DictInput {
-    type: String!
-    order: Int! = 0
-    name: String!
-    description: String
+  type: String!
+  order: Int! = 0
+  name: String!
+  description: String
 }
 
 type Mutation {
-    createDict(input: DictInput!): Dict!
-    updateDict(dictID: Int!, input: DictInput!): Dict!
-    deleteDict(dictID: Int!) : Boolean!
-    createFeatureTag(input: FeatureTagInput!): FeatureTag!
-    updateFeatureTag(featureTagID: Int!, input: FeatureTagInput!): FeatureTag!
-    createLicense(input: LicenseInput!): License!
-    updateLicense(licenseID: Int!, input: LicenseInput!): License!
-    deleteLicense(licenseID: Int!): Boolean!
-    createUserVisit(toolResultID: Int!): UserVisit!
-    createUserLicenseVisit(licenseID: Int!): UserLicenseVisit!
+  createDict(input: DictInput!): Dict!
+  updateDict(dictID: Int!, input: DictInput!): Dict!
+  deleteDict(dictID: Int!): Boolean!
+  createFeatureTag(input: FeatureTagInput!): FeatureTag!
+  updateFeatureTag(featureTagID: Int!, input: FeatureTagInput!): FeatureTag!
+  createLicense(input: LicenseInput!): License!
+  updateLicense(licenseID: Int!, input: LicenseInput!): License!
+  deleteLicense(licenseID: Int!): Boolean!
+  createUserVisit(toolResultID: Int!): UserVisit!
+  createUserLicenseVisit(licenseID: Int!): UserLicenseVisit!
 }
 
 type Query {
@@ -1056,6 +1099,7 @@ type Query {
   license(licenseID: Int!): License!
   listLicensesByType(indexType: String!, limit: Int!): [License!]!
   listLicensesByName(name: String!, limit: Int!): [License!]
+  listApprovedLicenses: [License!]!
   oauth2AuthURL(provider: String!): String!
   toolResult(toolResultID: Int!): ToolResult!
   currentUser: User!
@@ -1064,34 +1108,35 @@ type Query {
 }
 
 type User {
-    id: Int!
-    authType: String!
-    authID: String!
-    authLogin: String!
-    avatarUrl: String!
+  id: Int!
+  authType: String!
+  authID: String!
+  authLogin: String!
+  avatarUrl: String!
 }
 
 type UserVisit {
-    id: Int!
-    user: User!
-    toolResult: ToolResult!
+  id: Int!
+  user: User!
+  toolResult: ToolResult!
 }
 
 type UserLicenseVisit {
-    id: Int!
-    user: User!
-    license: License!
+  id: Int!
+  user: User!
+  license: License!
 }
 
 type LicensePagination {
-    page: Int!
-	count:      Int!
-	total:      Int!
-	totalPages: Int!
-    licenses: [License!]!
+  page: Int!
+  count: Int!
+  total: Int!
+  totalPages: Int!
+  licenses: [License!]!
 }
 
-scalar Time`, BuiltIn: false},
+scalar Time
+`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
@@ -2553,6 +2598,134 @@ func (ec *executionContext) _License_compareWith(ctx context.Context, field grap
 	return ec.marshalNCompareResult2ᚖgithubᚗcomᚋalecᚑzᚋlicenseᚑbackᚋgraphᚋmodelᚐCompareResult(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _License_fsfApproved(ctx context.Context, field graphql.CollectedField, obj *model.License) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "License",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FsfApproved, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalOBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _License_osiApproved(ctx context.Context, field graphql.CollectedField, obj *model.License) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "License",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OsiApproved, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalOBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _License_oeApproved(ctx context.Context, field graphql.CollectedField, obj *model.License) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "License",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OeApproved, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalOBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _License_lowRisk(ctx context.Context, field graphql.CollectedField, obj *model.License) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "License",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LowRisk, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalOBoolean2bool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _LicenseMainTag_id(ctx context.Context, field graphql.CollectedField, obj *model.LicenseMainTag) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -3381,6 +3554,41 @@ func (ec *executionContext) _Query_listLicensesByName(ctx context.Context, field
 	res := resTmp.([]*model.License)
 	fc.Result = res
 	return ec.marshalOLicense2ᚕᚖgithubᚗcomᚋalecᚑzᚋlicenseᚑbackᚋgraphᚋmodelᚐLicenseᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_listApprovedLicenses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ListApprovedLicenses(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.License)
+	fc.Result = res
+	return ec.marshalNLicense2ᚕᚖgithubᚗcomᚋalecᚑzᚋlicenseᚑbackᚋgraphᚋmodelᚐLicenseᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_oauth2AuthURL(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6025,6 +6233,14 @@ func (ec *executionContext) _License(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "fsfApproved":
+			out.Values[i] = ec._License_fsfApproved(ctx, field, obj)
+		case "osiApproved":
+			out.Values[i] = ec._License_osiApproved(ctx, field, obj)
+		case "oeApproved":
+			out.Values[i] = ec._License_oeApproved(ctx, field, obj)
+		case "lowRisk":
+			out.Values[i] = ec._License_lowRisk(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -6257,6 +6473,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_listLicensesByName(ctx, field)
+				return res
+			})
+		case "listApprovedLicenses":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_listApprovedLicenses(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
 				return res
 			})
 		case "oauth2AuthURL":
